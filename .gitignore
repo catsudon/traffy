@@ -1,4 +1,4 @@
 data/*
 *.csv
 downloads/*
-cache/ *
+cache/*
