@@ -9,32 +9,6 @@ import sqlite3
 
 st.set_page_config(layout="wide")
 
-st.markdown(f"""
-<div style="
-    position: relative;
-    width: 300px;
-    height: 200px;
-    background-image: url('https://us-fbcloud.net/picpost/data/275/275297-qgdmdm-10.n.jpg');
-    background-size: cover;
-    background-position: center;
-    border-radius: 8px;
-">
-    <div style="
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-color: rgba(255, 255, 255, 0.5);
-        padding: 10px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        font-weight: bold;
-    ">
-        <p style="margin: 0;">📍 Location Info</p>
-        <p style="margin: 0;">Something else here</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
 
 def is_valid_coords(val):
@@ -312,7 +286,7 @@ if filtered_df.empty:
     st.warning("No data matches your filters.")
 else:
     if enable_clustering:
-        st.subheader("🔥 Clustered Heatmap View")
+        st.subheader("🔥 Heatmap View")
         st.pydeck_chart(create_heatmap_map(filtered_df, places_df), use_container_width=True)
         
         st.subheader("🟢 Clustered Scatterplot View")
