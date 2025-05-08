@@ -30,6 +30,11 @@ def load_data():
     return df
 
 @st.cache_data
+def load_places():
+    places_df = pd.read_csv("data/bangkok_locations.csv")
+    return places_df
+
+@st.cache_data
 def run_dbscan(latlon_array, eps_km, min_samples):
     coords_rad = np.radians(latlon_array)
     eps_rad = eps_km / 6371.0
@@ -42,6 +47,7 @@ def run_kmeans(latlon_array, n_clusters):
     return model.fit_predict(latlon_array)
 
 df = load_data()
+
 
 st.sidebar.header("Filter Options")
 type_options = sorted(df["type_main"].dropna().unique())
@@ -95,6 +101,61 @@ map_style = f"mapbox://styles/mapbox/{map_style}-v9"
 opacity = st.sidebar.slider('Opacity', 0.0, 1.0, 0.5)
 radius_scale = st.sidebar.slider('Radius Scale', 1.0, 10.0, 5.0)
 color_choices = st.sidebar.radio('Color Palette', ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges'])
+st.sidebar.markdown("---")
+st.sidebar.subheader("Place Types to Show")
+place_type_options = ["7-Eleven", "RapidTransitStation", "BusStop", "place_of_worship"]
+# Initialize session state for place selection
+if "selected_place_types" not in st.session_state:
+    st.session_state.selected_place_types = place_type_options.copy()
+
+# Sidebar UI
+st.sidebar.subheader("Place Types to Show")
+col1, col2 = st.sidebar.columns([1, 1])
+with col1:
+    if st.button("Select All"):
+        st.session_state.selected_place_types = place_type_options.copy()
+with col2:
+    if st.button("Clear All"):
+        st.session_state.selected_place_types = []
+
+# Multiselect that uses session state
+selected_place_types = st.sidebar.multiselect(
+    "Select Place Types",
+    place_type_options,
+    default=st.session_state.selected_place_types,
+    key="selected_place_types"
+)
+
+places_df = load_places()
+places_df = places_df[places_df["type"].isin(selected_place_types)].copy()
+st.write("Places loaded:", places_df.shape[0])
+st.dataframe(places_df.head())
+
+icon_url_map = {
+    "7-Eleven": "https://img.icons8.com/color/48/000000/shop.png",
+    "RapidTransitStation": "https://img.icons8.com/color/48/000000/train.png",
+    "BusStop": "https://img.icons8.com/color/48/000000/bus.png",
+    "place_of_worship": "https://img.icons8.com/color/48/000000/church.png"
+}
+
+places_df["icon_data"] = places_df["type"].map(icon_url_map)
+places_df["icon"] = places_df["icon_data"].apply(lambda url: {
+    "url": url,
+    "width": 48,
+    "height": 48,
+    "anchorY": 48
+})
+
+filtered_df["tooltip_text"] = (
+    "<b>Type:</b> " + filtered_df["type_main"] +
+    "<br/><b>Comment:</b> " + filtered_df["comment"].fillna("")
+)
+
+places_df["tooltip_text"] = (
+    "<b>Name:</b> " + places_df["name"] +
+    "<br/><b>Type:</b> " + places_df["type"]
+)
+
 
 color_mapping = {
     "Reds": [255, 0, 0, 140],
@@ -105,11 +166,18 @@ color_mapping = {
 }
 default_color = color_mapping[color_choices]
 
-def create_map(dataframe):
+def map_zoom_scale(view_zoom):
+    # Adjust multiplier to suit how sensitive you want icon scaling
+    return view_zoom * 1.2
+
+def create_map(dataframe, places_df=None):
     if dataframe.empty:
         return None
 
-    layer = pdk.Layer(
+    layers = []
+
+    # Complaint layer
+    layers.append(pdk.Layer(
         "ScatterplotLayer" if map_layer_type == "ScatterplotLayer" else "HeatmapLayer",
         dataframe,
         get_position=["lon", "lat"],
@@ -118,28 +186,51 @@ def create_map(dataframe):
         radius_scale=radius_scale if map_layer_type == "ScatterplotLayer" else None,
         opacity=opacity,
         pickable=True
-    )
+    ))
 
+    # Icon layer for places
+    if places_df is not None and not places_df.empty:
+        layers.append(pdk.Layer(
+            "IconLayer",
+            data=places_df,
+            get_icon="icon",
+            get_size=1,
+            size_scale=map_zoom_scale(view_zoom=10), 
+            get_position=["lon", "lat"],
+            pickable=True
+        ))
+
+    zoom_level = 10  # adjust default if needed
     view_state = pdk.ViewState(
         longitude=dataframe["lon"].mean(),
         latitude=dataframe["lat"].mean(),
-        zoom=10
+        zoom=zoom_level
     )
 
+
+    # 🔹 Tooltip covers both complaints and places
+    tooltip = {
+        "html": "<div>{tooltip_text}</div>",
+        "style": {"backgroundColor": "black", "color": "white"}
+    }
+
+
     return pdk.Deck(
-        layers=[layer],
+        layers=layers,
         initial_view_state=view_state,
         map_style=map_style,
-        tooltip={"text": "{type_main}\n{comment}"}
+        tooltip=tooltip
     )
+
+
 
 st.title("📍 Traffy Bangkok Complaints Map + Clustering")
 st.markdown("Filter by type and date. Choose clustering algorithm and visualize spatial patterns.")
 
-if filtered_df.empty:
+if 0 and filtered_df.empty:
     st.warning("No data matches your filters.")
 else:
-    st.pydeck_chart(create_map(filtered_df), use_container_width=True, height=700)
+    st.pydeck_chart(create_map(filtered_df, places_df), use_container_width=True)
     cols = ["ticket_id", "type_main", "timestamp", "comment", "lat", "lon"]
     if enable_clustering:
         cols.append("cluster")
