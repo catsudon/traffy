@@ -2,3 +2,5 @@ data/*
 *.csv
 downloads/*
 cache/*
+*.xlsx
+busStop/
