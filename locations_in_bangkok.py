@@ -3,7 +3,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 
 # Step 1: Load your dataset
-df = pd.read_csv("data/bangkok_locations.csv")  # Replace with your actual file name
+df = pd.read_csv("data/busStop.csv")  # Replace with your actual file name
 
 # Step 2: Convert to GeoDataFrame
 geometry = [Point(xy) for xy in zip(df['lon'], df['lat'])]
@@ -17,4 +17,4 @@ bangkok = thailand[thailand['NAME_1'].str.contains("Bangkok", case=False)]
 gdf_bangkok = gdf[gdf.within(bangkok.unary_union)]
 
 # Step 5: Save filtered data (optional)
-gdf_bangkok.drop(columns="geometry").to_csv("data/bangkok_filtered_locations.csv", index=False)
+gdf_bangkok.drop(columns="geometry").to_csv("data/bangkok_busStop.csv", index=False)

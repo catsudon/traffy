@@ -31,7 +31,7 @@ def load_data():
 
 @st.cache_data
 def load_places():
-    places_df = pd.read_csv("data/bangkok_filtered_locations.csv")
+    places_df = pd.read_csv("data/bangkok_locations.csv")
     return places_df
 
 @st.cache_data
@@ -106,10 +106,9 @@ st.sidebar.subheader("Place Types to Show")
 place_type_options = ["7-Eleven", "RapidTransitStation", "BusStop", "place_of_worship"]
 # Initialize session state for place selection
 if "selected_place_types" not in st.session_state:
-    st.session_state.selected_place_types = place_type_options.copy()
+    st.session_state.selected_place_types = []
 
 # Sidebar UI
-st.sidebar.subheader("Place Types to Show")
 col1, col2 = st.sidebar.columns([1, 1])
 with col1:
     if st.button("Select All"):
