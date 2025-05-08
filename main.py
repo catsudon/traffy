@@ -61,7 +61,7 @@ selected_types = st.sidebar.multiselect("Select Problem Types", type_options, de
 
 min_date = df["timestamp"].min().date()
 max_date = df["timestamp"].max().date()
-default_start = max(min_date, max_date - timedelta(days=180))
+default_start = max(min_date, max_date - timedelta(days=150))
 start_date, end_date = st.sidebar.date_input("Date Range", [default_start, max_date], min_value=min_date, max_value=max_date)
 
 filtered_df = df[
