@@ -5,6 +5,7 @@ from datetime import timedelta, date
 from sklearn.cluster import DBSCAN, KMeans
 import numpy as np
 import random
+import sqlite3
 
 st.set_page_config(layout="wide")
 
@@ -19,8 +20,10 @@ def is_valid_coords(val):
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/bangkok_traffy_cleaned.csv", low_memory=False)
-    print("loaded data")
+    conn = sqlite3.connect("data/traffy.db")
+    df = pd.read_sql_query("SELECT * FROM traffy", conn)
+    conn.close()
+    
     df = df[df['coords'].apply(is_valid_coords)].copy()
     df[['lon', 'lat']] = df['coords'].str.split(",", expand=True).astype(float)
     df['type'] = df['type'].astype(str).str.strip('{}').str.strip()
