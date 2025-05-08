@@ -104,7 +104,6 @@ map_style = st.sidebar.radio("Map Style", ["dark", "light", "streets", "satellit
 map_style = f"mapbox://styles/mapbox/{map_style}-v9"
 opacity = st.sidebar.slider('Opacity', 0.0, 1.0, 0.5)
 radius_scale = st.sidebar.slider('Radius Scale', 1.0, 10.0, 5.0)
-color_choices = st.sidebar.radio('Color Palette', ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges'])
 st.sidebar.markdown("---")
 st.sidebar.subheader("Place Types to Show")
 place_type_options = ["7-Eleven", "RapidTransitStation", "BusStop", "place_of_worship"]
@@ -175,9 +174,11 @@ color_mapping = {
     "Blues": [0, 0, 255, 140],
     "Greens": [0, 255, 0, 140],
     "Purples": [128, 0, 128, 140],
-    "Oranges": [255, 165, 0, 140]
+    "Oranges": [255, 165, 0, 140],
+    "YlGn": [255, 255, 0, 140],
+    "YlOrBr": [255, 215, 0, 140],
 }
-default_color = color_mapping[color_choices]
+default_color = color_mapping["YlOrBr"]
 
 def map_zoom_scale(view_zoom):
     # Adjust multiplier to suit how sensitive you want icon scaling
