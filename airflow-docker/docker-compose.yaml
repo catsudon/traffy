@@ -11,13 +11,17 @@ services:
       - postgres-db-volume:/var/lib/postgresql/data
 
   airflow-webserver:
+    build: .
     image: apache/airflow:2.8.1-python3.10
     depends_on:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__WEBSERVER__SECRET_KEY: a_random_secret_key
+      AIRFLOW__WEBSERVER__SECRET_KEY: etherlily
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__LOGGING__REMOTE_LOGGING: False
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
       _AIRFLOW_WWW_USER_EMAIL: admin@example.com
@@ -25,6 +29,8 @@ services:
       _AIRFLOW_WWW_USER_LASTNAME: User
     volumes:
       - ./dags:/opt/airflow/dags
+      - ./traffy_data:/opt/airflow/data
+      - ./logs:/opt/airflow/logs        # ✅ Required for logs to work
     ports:
       - "8080:8080"
     command: >
@@ -35,14 +41,21 @@ services:
       "
 
   airflow-scheduler:
+    build: .
     image: apache/airflow:2.8.1-python3.10
     depends_on:
       - airflow-webserver
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: etherlily               # ✅ MATCH this
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__LOGGING__REMOTE_LOGGING: False
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
     volumes:
       - ./dags:/opt/airflow/dags
+      - ./traffy_data:/opt/airflow/data
+      - ./logs:/opt/airflow/logs        # ✅ Required here too
     command: airflow scheduler
 
 volumes:
