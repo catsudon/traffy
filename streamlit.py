@@ -20,6 +20,7 @@ def is_valid_coords(val):
 @st.cache_data
 def load_data():
     df = pd.read_csv("data/bangkok_traffy_cleaned.csv", low_memory=False)
+    print("loaded data")
     df = df[df['coords'].apply(is_valid_coords)].copy()
     df[['lon', 'lat']] = df['coords'].str.split(",", expand=True).astype(float)
     df['type'] = df['type'].astype(str).str.strip('{}').str.strip()
