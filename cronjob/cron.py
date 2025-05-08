@@ -1,23 +1,27 @@
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+import sqlite3
+from datetime import datetime, timedelta, timezone
 
+# === Time Setup ===
 def get_hour_range():
-    now = datetime.now()
+    now = datetime.now(timezone.utc) - timedelta(hours=1) # ensure offset-aware datetime
     end = now.replace(minute=0, second=0, microsecond=0)
     start = end - timedelta(hours=1)
     return start.isoformat(), end.isoformat()
 
+# === Fetch ===
 def fetch_data(start, end):
     url = f"https://publicapi.traffy.in.th/teamchadchart-stat-api/geojson/v1?start={start}&end={end}"
     response = requests.get(url)
     response.raise_for_status()
     return response.json()
 
+# === Clean Raw JSON to DataFrame ===
 def clean_data(raw_json):
     features = raw_json.get("features", [])
-
     records = []
+
     for f in features:
         props = f.get("properties", {})
         coords = f.get("geometry", {}).get("coordinates", [None, None])
@@ -27,58 +31,21 @@ def clean_data(raw_json):
 
     df = pd.DataFrame(records)
 
-    # Fill missing values
+    # Fill missing
     df['comment'] = df.get('description', '').fillna('')
     df['type'] = df.get('type', 'unknown').fillna('unknown')
-    # df['organization'] = df.get('organization', 'unknown').fillna('unknown')
     df['district'] = df.get('district', 'unknown').fillna('unknown')
     df['subdistrict'] = df.get('subdistrict', 'unknown').fillna('unknown')
     df['address'] = df.get('address', 'unknown').fillna('unknown')
-    
 
-    # Drop rows where both lat/lon are missing
+    # Filter invalid
     df['valid_coords'] = df[['lat', 'lon']].notna().all(axis=1)
     df = df[df['valid_coords']].reset_index(drop=True)
-
-    # Drop missing or empty type
     df = df[~(df['type'].astype(str).str.strip() == '{}')].reset_index(drop=True)
 
     return df
 
-def remap_df(df):
-    df['photo'] = df.get('photo_url', '')
-    df['photo_after'] = df.get('after_photo', '')
-    df['coords'] = df.apply(lambda row: f"{row['lon']},{row['lat']}" if pd.notna(row['lon']) and pd.notna(row['lat']) else '', axis=1)
-    df['type_clean'] = df['problem_type_fondue'].apply(lambda x: eval(x) if isinstance(x, str) else x)
-    df['type_clean'] = df['type_clean'].apply(format_type_clean)
-
-    # บางที org เป็น str list เช่น "['A', 'B']" → ต้อง eval
-    def safe_first(x):
-        try:
-            return eval(x)[0] if isinstance(x, str) else (x[0] if isinstance(x, list) else 'unknown')
-        except:
-            return 'unknown'
-
-    df['organization'] = df['org'].apply(safe_first)
-
-    # สร้าง DataFrame ใหม่แบบคอลัมน์เรียงตามต้องการ
-    final_df = df[[
-        'ticket_id', 'type', 'organization', 'comment', 'photo', 'photo_after', 'coords',
-        'address', 'subdistrict', 'district', 'province', 'timestamp', 'state', 'star',
-        'count_reopen', 'last_activity', 'valid_coords', 'lat', 'lon', 'type_clean'
-    ]].copy()
-
-    return final_df
-
-
-
-def save_to_csv(df, start):
-    fname = f"data/traffy_{start[:13].replace(':','')}.csv"
-    df.to_csv(fname, index=False)
-    print(f"Saved {len(df)} rows to {fname}")
-
-import sqlite3
-
+# === Format type_clean field ===
 def format_type_clean(x):
     if isinstance(x, str):
         try:
@@ -89,9 +56,47 @@ def format_type_clean(x):
         return "{" + ", ".join(str(i) for i in x) + "}"
     return "{}"
 
+# === Remap fields to standard schema ===
+def remap_df(df):
+    df['photo'] = df.get('photo_url', '')
+    df['photo_after'] = df.get('after_photo', '')
+    df['coords'] = df.apply(lambda row: f"{row['lon']},{row['lat']}" if pd.notna(row['lon']) and pd.notna(row['lat']) else '', axis=1)
+    
+    df['type_clean'] = df['problem_type_fondue'].apply(lambda x: eval(x) if isinstance(x, str) else x)
+    df['type_clean'] = df['type_clean'].apply(format_type_clean)
 
+    def safe_first(x):
+        try:
+            return eval(x)[0] if isinstance(x, str) else (x[0] if isinstance(x, list) else 'unknown')
+        except:
+            return 'unknown'
+
+    df['organization'] = df['org'].apply(safe_first)
+
+    final_df = df[[
+        'ticket_id', 'type', 'organization', 'comment', 'photo', 'photo_after', 'coords',
+        'address', 'subdistrict', 'district', 'province', 'timestamp', 'state', 'star',
+        'count_reopen', 'last_activity', 'valid_coords', 'lat', 'lon', 'type_clean'
+    ]].copy()
+
+    final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], errors='coerce', utc=True)
+    final_df['timestamp'] = final_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S.%f%z')
+
+    return final_df
+
+# === Save to CSV (Optional/debugging) ===
+def save_to_csv(df, start):
+    fname = f"data/traffy_{start[:13].replace(':','')}.csv"
+    df.to_csv(fname, index=False)
+    print(f"Saved {len(df)} rows to {fname}")
+
+# === Save to SQLite ===
 def save_to_sqlite(df, db_path="data/traffy.db"):
     conn = sqlite3.connect(db_path)
+
+    # Ensure type_clean is string
+    df['type_clean'] = df['type_clean'].apply(format_type_clean)
+
     df.to_sql("traffy", conn, if_exists="append", index=False,
               dtype={
                   "ticket_id": "TEXT",
@@ -115,8 +120,8 @@ def save_to_sqlite(df, db_path="data/traffy.db"):
                   "lon": "REAL",
                   "type_clean": "TEXT"
               })
-    
-    # Remove duplicates by ticket_id (keep latest)
+
+    # Deduplicate by ticket_id
     conn.execute("""
         DELETE FROM traffy
         WHERE rowid NOT IN (
@@ -129,12 +134,15 @@ def save_to_sqlite(df, db_path="data/traffy.db"):
     conn.close()
     print(f"Appended {len(df)} rows to traffy.db")
 
-
+# === Main Execution ===
 if __name__ == "__main__":
     start, end = get_hour_range()
+    start.replace("+00:00", "")
+    end.replace("+00:00", "")
     print(f"Fetching data from {start} to {end}")
     raw = fetch_data(start, end)
     df = clean_data(raw)
     df = remap_df(df)
+    print(df['timestamp'].min(), df['timestamp'].max(), "Data loaded")
     save_to_csv(df, start)
     save_to_sqlite(df)
