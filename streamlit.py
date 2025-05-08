@@ -31,7 +31,7 @@ def load_data():
 
 @st.cache_data
 def load_places():
-    places_df = pd.read_csv("data/bangkok_locations.csv")
+    places_df = pd.read_csv("data/bangkok_filtered_locations.csv")
     return places_df
 
 @st.cache_data
@@ -129,7 +129,6 @@ selected_place_types = st.sidebar.multiselect(
 places_df = load_places()
 places_df = places_df[places_df["type"].isin(selected_place_types)].copy()
 st.write("Places loaded:", places_df.shape[0])
-st.dataframe(places_df.head())
 
 icon_url_map = {
     "7-Eleven": "https://img.icons8.com/color/48/000000/shop.png",
