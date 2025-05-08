@@ -130,7 +130,6 @@ selected_place_types = st.sidebar.multiselect(
 
 places_df = load_places()
 places_df = places_df[places_df["type"].isin(selected_place_types)].copy()
-st.write("Places loaded:", places_df.shape[0])
 
 icon_url_map = {
     "7-Eleven": "https://img.icons8.com/color/48/000000/shop.png",
@@ -150,7 +149,7 @@ places_df["icon"] = places_df["icon_data"].apply(lambda url: {
 
 def build_tooltip(row):
     tooltip = f"""
-    <div style="max-width: 300px;">
+    <div style="max-width: 300px; z-index: 9999;">
         <b>Type:</b> {row['type_main']}<br/>
         <b>Comment:</b> {row['comment'] or ''}<br/>
     """

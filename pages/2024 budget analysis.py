@@ -65,28 +65,66 @@ st.dataframe(
     use_container_width=True
 )
 
-# --- Placeholder map ---
-st.subheader("🗺️ Map View (Placeholder Coordinates)")
-merged_df["lon"] = 100.5  # TODO: Replace with real coordinates
-merged_df["lat"] = 13.75
+import geopandas as gpd
+import json
 
-layer = pdk.Layer(
-    "ScatterplotLayer",
-    merged_df,
-    get_position='[lon, lat]',
-    get_radius=30000,
-    get_fill_color='[255 - complaints, 100, complaints * 2, 160]',
-    pickable=True
+# Load GADM GeoJSON and filter for Bangkok
+gdf = gpd.read_file("data/gadm41_THA_2.json")
+bangkok_gdf = gdf[gdf["NAME_1"].str.contains("Bangkok|กรุงเทพ", case=False, na=False)].copy()
+
+# Normalize names to match `merged_df`
+bangkok_gdf["district"] = (
+    bangkok_gdf["NL_NAME_2"]
+    .str.strip()
+    .str.replace(" ", "")
+    .str.replace(")", "", regex=False)
+    .str.replace("บางกะป", "บางกะปิ")
+)
+
+# Normalize merged_df names too
+merged_df["district"] = merged_df["district"].str.replace(" ", "")
+
+# Merge shapes with complaint/budget data
+geo_merged = bangkok_gdf.merge(merged_df, on="district", how="left")
+
+# Normalize budget_per_complaint to 0–255 red intensity
+max_val = geo_merged["budget_per_complaint"].quantile(0.95)
+geo_merged["norm_val"] = (
+    geo_merged["budget_per_complaint"]
+    .clip(upper=max_val)
+    .fillna(0)
+    / max_val
+).clip(0, 1)
+
+# Compute red-green spectrum
+geo_merged["r"] = (geo_merged["norm_val"] * 255).astype(int)
+geo_merged["g"] = ((1 - geo_merged["norm_val"]) * 255).astype(int)
+
+# Convert to GeoJSON
+geojson_data = json.loads(geo_merged.to_json())
+
+polygon_layer = pdk.Layer(
+    "GeoJsonLayer",
+    data=geojson_data,
+    pickable=True,
+    stroked=True,
+    filled=True,
+    get_fill_color='[properties.r, properties.g, 0, 180]',
+    get_line_color=[0, 0, 0],
+    line_width_min_pixels=1,
 )
 
 view_state = pdk.ViewState(latitude=13.75, longitude=100.5, zoom=9)
 
+# Display in Streamlit
+st.subheader("🗺️ Bangkok District Polygons — Red = More Budget Per Complaint")
 st.pydeck_chart(pdk.Deck(
-    map_style='mapbox://styles/mapbox/dark-v9',
+    map_style="mapbox://styles/mapbox/dark-v9",
     initial_view_state=view_state,
-    layers=[layer],
-    tooltip={"text": "District: {district}\nComplaints: {complaints}\nBudget: {budget_total:,.0f}"}
+    layers=[polygon_layer],
+    tooltip={"text": "District: {district}\nComplaints: {complaints}\nBudget: {budget_total}\nBudget per complaint: {budget_per_complaint}"}
 ))
+
 
 
 unmatched = set(traffy_df["district"].unique()) - set(budget_df["district"].unique())
