@@ -95,7 +95,7 @@ if enable_clustering and not filtered_df.empty:
 else:
     filtered_df['cluster_color'] = None
 
-map_layer_type = st.sidebar.radio('Map Type', ["ScatterplotLayer", "HeatmapLayer"])
+# map_layer_type = st.sidebar.radio('Map Type', ["ScatterplotLayer", "HeatmapLayer"])
 map_style = st.sidebar.radio("Map Style", ["dark", "light", "streets", "satellite"])
 map_style = f"mapbox://styles/mapbox/{map_style}-v9"
 opacity = st.sidebar.slider('Opacity', 0.0, 1.0, 0.5)
@@ -179,45 +179,40 @@ def map_zoom_scale(view_zoom):
     # Adjust multiplier to suit how sensitive you want icon scaling
     return view_zoom * 1.2
 
-def create_map(dataframe, places_df=None):
+def create_scatter_map(dataframe, places_df=None):
     if dataframe.empty:
         return None
 
     layers = []
 
-    # Complaint layer
     layers.append(pdk.Layer(
-        "ScatterplotLayer" if map_layer_type == "ScatterplotLayer" else "HeatmapLayer",
+        "ScatterplotLayer",
         dataframe,
         get_position=["lon", "lat"],
         get_color="cluster_color" if enable_clustering else default_color,
-        get_radius="radius" if map_layer_type == "ScatterplotLayer" else None,
-        radius_scale=radius_scale if map_layer_type == "ScatterplotLayer" else None,
+        get_radius="radius",
+        radius_scale=radius_scale,
         opacity=opacity,
         pickable=True
     ))
 
-    # Icon layer for places
     if places_df is not None and not places_df.empty:
         layers.append(pdk.Layer(
             "IconLayer",
             data=places_df,
             get_icon="icon",
             get_size=1,
-            size_scale=map_zoom_scale(view_zoom=10), 
+            size_scale=map_zoom_scale(view_zoom=10),
             get_position=["lon", "lat"],
             pickable=True
         ))
 
-    zoom_level = 10  # adjust default if needed
     view_state = pdk.ViewState(
         longitude=dataframe["lon"].mean(),
         latitude=dataframe["lat"].mean(),
-        zoom=zoom_level
+        zoom=10
     )
 
-
-    # 🔹 Tooltip covers both complaints and places
     tooltip = {
         "html": "{tooltip_text}",
         "style": {
@@ -229,29 +224,71 @@ def create_map(dataframe, places_df=None):
         }
     }
 
+    return pdk.Deck(layers=layers, initial_view_state=view_state, map_style=map_style, tooltip=tooltip)
 
 
+def create_heatmap_map(dataframe, places_df=None):
+    if dataframe.empty:
+        return None
 
-    return pdk.Deck(
-        layers=layers,
-        initial_view_state=view_state,
-        map_style=map_style,
-        tooltip=tooltip
+    layers = []
+
+    layers.append(pdk.Layer(
+        "HeatmapLayer",
+        dataframe,
+        get_position=["lon", "lat"],
+        opacity=opacity
+    ))
+
+    if places_df is not None and not places_df.empty:
+        layers.append(pdk.Layer(
+            "IconLayer",
+            data=places_df,
+            get_icon="icon",
+            get_size=1,
+            size_scale=map_zoom_scale(view_zoom=10),
+            get_position=["lon", "lat"],
+            pickable=True
+        ))
+
+    view_state = pdk.ViewState(
+        longitude=dataframe["lon"].mean(),
+        latitude=dataframe["lat"].mean(),
+        zoom=10
     )
+
+    tooltip = {
+        "html": "{tooltip_text}",
+        "style": {
+            "backgroundColor": "white",
+            "color": "black",
+            "fontSize": "12px",
+            "padding": "10px",
+            "maxWidth": "300px"
+        }
+    }
+
+    return pdk.Deck(layers=layers, initial_view_state=view_state, map_style=map_style, tooltip=tooltip)
+
 
 
 
 st.title("📍 Traffy Bangkok Complaints Map + Clustering")
 st.markdown("Filter by type and date. Choose clustering algorithm and visualize spatial patterns.")
 
-if 0 and filtered_df.empty:
+if filtered_df.empty:
     st.warning("No data matches your filters.")
 else:
-    st.pydeck_chart(create_map(filtered_df, places_df), use_container_width=True)
-    cols = ["ticket_id", "type_main", "timestamp", "comment", "lat", "lon"]
     if enable_clustering:
-        cols.append("cluster")
-    # st.dataframe(filtered_df[cols])
+        st.subheader("🔥 Clustered Heatmap View")
+        st.pydeck_chart(create_heatmap_map(filtered_df, places_df), use_container_width=True)
+        
+        st.subheader("🟢 Clustered Scatterplot View")
+        st.pydeck_chart(create_scatter_map(filtered_df, places_df), use_container_width=True)
+    else:
+        st.subheader("🗺️ General View")
+        st.pydeck_chart(create_scatter_map(filtered_df, places_df), use_container_width=True)
+
 
 
 
