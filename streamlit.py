@@ -106,10 +106,9 @@ st.sidebar.subheader("Place Types to Show")
 place_type_options = ["7-Eleven", "RapidTransitStation", "BusStop", "place_of_worship"]
 # Initialize session state for place selection
 if "selected_place_types" not in st.session_state:
-    st.session_state.selected_place_types = place_type_options.copy()
+    st.session_state.selected_place_types = []
 
 # Sidebar UI
-st.sidebar.subheader("Place Types to Show")
 col1, col2 = st.sidebar.columns([1, 1])
 with col1:
     if st.button("Select All"):
@@ -129,7 +128,6 @@ selected_place_types = st.sidebar.multiselect(
 places_df = load_places()
 places_df = places_df[places_df["type"].isin(selected_place_types)].copy()
 st.write("Places loaded:", places_df.shape[0])
-st.dataframe(places_df.head())
 
 icon_url_map = {
     "7-Eleven": "https://img.icons8.com/color/48/000000/shop.png",
@@ -235,3 +233,7 @@ else:
     if enable_clustering:
         cols.append("cluster")
     # st.dataframe(filtered_df[cols])
+
+
+
+

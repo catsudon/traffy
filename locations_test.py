@@ -21,6 +21,7 @@ icon_data = {
     }
 }
 
+
 places_df["icon"] = places_df["icon_name"]
 
 icon_layer = pdk.Layer(
