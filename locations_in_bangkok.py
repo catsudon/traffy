@@ -16,5 +16,6 @@ bangkok = thailand[thailand['NAME_1'].str.contains("Bangkok", case=False)]
 # Step 4: Spatial filtering — keep only points inside Bangkok
 gdf_bangkok = gdf[gdf.within(bangkok.unary_union)]
 
+
 # Step 5: Save filtered data (optional)
 gdf_bangkok.drop(columns="geometry").to_csv("data/bangkok_busStop.csv", index=False)
