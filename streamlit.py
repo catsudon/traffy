@@ -104,7 +104,7 @@ color_choices = st.sidebar.radio('Color Palette', ['Reds', 'Blues', 'Greens', 'P
 st.sidebar.markdown("---")
 st.sidebar.subheader("Place Types to Show")
 place_type_options = ["7-Eleven", "RapidTransitStation", "BusStop", "place_of_worship"]
-# Initialize session state for place selection
+# Initialize session state if not present
 if "selected_place_types" not in st.session_state:
     st.session_state.selected_place_types = []
 
@@ -117,13 +117,13 @@ with col2:
     if st.button("Clear All"):
         st.session_state.selected_place_types = []
 
-# Multiselect that uses session state
+# Multiselect without a conflicting default
 selected_place_types = st.sidebar.multiselect(
     "Select Place Types",
     place_type_options,
-    default=st.session_state.selected_place_types,
     key="selected_place_types"
 )
+
 
 places_df = load_places()
 places_df = places_df[places_df["type"].isin(selected_place_types)].copy()
@@ -144,10 +144,21 @@ places_df["icon"] = places_df["icon_data"].apply(lambda url: {
     "anchorY": 48
 })
 
-filtered_df["tooltip_text"] = (
-    "<b>Type:</b> " + filtered_df["type_main"] +
-    "<br/><b>Comment:</b> " + filtered_df["comment"].fillna("")
-)
+
+def build_tooltip(row):
+    tooltip = f"""
+    <div style="max-width: 300px;">
+        <b>Type:</b> {row['type_main']}<br/>
+        <b>Comment:</b> {row['comment'] or ''}<br/>
+    """
+    if pd.notna(row['photo']):
+        tooltip += f'<img src="{row["photo"]}" style="width:100%; height:auto; margin-top:5px;" />'
+    tooltip += "</div>"
+    return tooltip
+
+
+filtered_df["tooltip_text"] = filtered_df.apply(build_tooltip, axis=1)
+
 
 places_df["tooltip_text"] = (
     "<b>Name:</b> " + places_df["name"] +
@@ -208,9 +219,17 @@ def create_map(dataframe, places_df=None):
 
     # 🔹 Tooltip covers both complaints and places
     tooltip = {
-        "html": "<div>{tooltip_text}</div>",
-        "style": {"backgroundColor": "black", "color": "white"}
+        "html": "{tooltip_text}",
+        "style": {
+            "backgroundColor": "white",
+            "color": "black",
+            "fontSize": "12px",
+            "padding": "10px",
+            "maxWidth": "300px"
+        }
     }
+
+
 
 
     return pdk.Deck(
