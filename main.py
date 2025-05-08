@@ -9,6 +9,12 @@ import sqlite3
 
 st.set_page_config(layout="wide")
 
+st.markdown(
+    '<img src="https://example.com/image.jpg" width="300" />',
+    unsafe_allow_html=True
+)
+
+
 def is_valid_coords(val):
     try:
         lon, lat = val.split(",")
@@ -149,7 +155,7 @@ places_df["icon"] = places_df["icon_data"].apply(lambda url: {
 
 def build_tooltip(row):
     tooltip = f"""
-    <div style="max-width: 300px; z-index: 9999;">
+    <div style="max-width: 300px; z-index: 9999;  position: relative; ">
         <b>Type:</b> {row['type_main']}<br/>
         <b>Comment:</b> {row['comment'] or ''}<br/>
     """
